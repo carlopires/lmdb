@@ -184,7 +184,7 @@ typedef int mdb_filehandle_t;
 /** Library minor version */
 #define MDB_VERSION_MINOR	9
 /** Library patch version */
-#define MDB_VERSION_PATCH	10
+#define MDB_VERSION_PATCH	11
 
 /** Combine args a,b,c into a single integer for easy version comparisons */
 #define MDB_VERINT(a,b,c)	(((a) << 24) | ((b) << 16) | (c))
@@ -194,7 +194,7 @@ typedef int mdb_filehandle_t;
 	MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH)
 
 /** The release date of this library version */
-#define MDB_VERSION_DATE	"November 11, 2013"
+#define MDB_VERSION_DATE	"January 15, 2014"
 
 /** A stringifier for the version info */
 #define MDB_VERSTR(a,b,c,d)	"MDB " #a "." #b "." #c ": (" d ")"
@@ -263,8 +263,6 @@ typedef int  (MDB_cmp_func)(const MDB_val *a, const MDB_val *b);
 typedef void (MDB_rel_func)(MDB_val *item, void *oldptr, void *newptr, void *relctx);
 
 /** @defgroup	mdb_env	Environment Flags
- *
- *	Values do not overlap Database Flags.
  *	@{
  */
 	/** mmap at a fixed address (experimental) */
@@ -292,8 +290,6 @@ typedef void (MDB_rel_func)(MDB_val *item, void *oldptr, void *newptr, void *rel
 /** @} */
 
 /**	@defgroup	mdb_dbi_open	Database Flags
- *
- *	Values do not overlap Environment Flags.
  *	@{
  */
 	/** use reverse string keys */
@@ -672,7 +668,8 @@ void mdb_env_close(MDB_env *env);
 	/** @brief Set environment flags.
 	 *
 	 * This may be used to set some flags in addition to those from
-	 * #mdb_env_open(), or to unset these flags.
+	 * #mdb_env_open(), or to unset these flags.  If several threads
+	 * change the flags at the same time, the result is undefined.
 	 * @param[in] env An environment handle returned by #mdb_env_create()
 	 * @param[in] flags The flags to change, bitwise OR'ed together
 	 * @param[in] onoff A non-zero value sets the flags, zero clears them.
@@ -805,6 +802,38 @@ int  mdb_env_set_maxdbs(MDB_env *env, MDB_dbi dbs);
 	 * @return The maximum size of a key we can write
 	 */
 int  mdb_env_get_maxkeysize(MDB_env *env);
+
+	/** @brief Set application information associated with the #MDB_env.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create()
+	 * @param[in] ctx An arbitrary pointer for whatever the application needs.
+	 * @return A non-zero error value on failure and 0 on success.
+	 */
+int  mdb_env_set_userctx(MDB_env *env, void *ctx);
+
+	/** @brief Get the application information associated with the #MDB_env.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create()
+	 * @return The pointer set by #mdb_env_set_userctx().
+	 */
+void *mdb_env_get_userctx(MDB_env *env);
+
+	/** @brief A callback function for most MDB assert() failures,
+	 * called before printing the message and aborting.
+	 *
+	 * @param[in] env An environment handle returned by #mdb_env_create().
+	 * @param[in] msg The assertion message, not including newline.
+	 */
+typedef void MDB_assert_func(MDB_env *env, const char *msg);
+
+	/** Set or reset the assert() callback of the environment.
+	 * Disabled if liblmdb is buillt with NDEBUG.
+	 * @note This hack should become obsolete as lmdb's error handling matures.
+	 * @param[in] env An environment handle returned by #mdb_env_create().
+	 * @param[in] func An #MDB_assert_func function, or 0.
+	 * @return A non-zero error value on failure and 0 on success.
+	 */
+int  mdb_env_set_assert(MDB_env *env, MDB_assert_func *func);
 
 	/** @brief Create a transaction for use with the environment.
 	 *
@@ -1305,7 +1334,9 @@ int  mdb_cursor_get(MDB_cursor *cursor, MDB_val *key, MDB_val *data,
 	 * <ul>
 	 *	<li>#MDB_CURRENT - overwrite the data of the key/data pair to which
 	 *		the cursor refers with the specified data item. The \b key
-	 *		parameter is ignored.
+	 *		parameter is not used for positioning the cursor, but should
+	 *		still be provided. If using sorted duplicates (#MDB_DUPSORT)
+	 *		the data item must still sort into the same place.
 	 *	<li>#MDB_NODUPDATA - enter the new key/data pair only if it does not
 	 *		already appear in the database. This flag may only be specified
 	 *		if the database was opened with #MDB_DUPSORT. The function will
