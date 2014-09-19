@@ -1948,7 +1948,7 @@ mdb_page_alloc(MDB_cursor *mc, int num, MDB_page **mp)
 #else
 	enum { Paranoid = 0, Max_retries = INT_MAX /*infinite*/ };
 #endif
-	int rc, retry = num * 20;
+	int rc, retry = num * 60;
 	MDB_txn *txn = mc->mc_txn;
 	MDB_env *env = txn->mt_env;
 	pgno_t pgno, *mop = env->me_pghead;
@@ -2626,6 +2626,7 @@ mdb_txn_begin(MDB_env *env, MDB_txn *parent, unsigned int flags, MDB_txn **ret)
 	if (!(flags & MDB_RDONLY)) {
 		if (!parent) {
 			txn = env->me_txn0;
+			txn->mt_flags = 0;
 			goto ok;
 		}
 		size += env->me_maxdbs * sizeof(MDB_cursor *);
@@ -4559,6 +4560,7 @@ mdb_env_close0(MDB_env *env, int excl)
 	free(env->me_dbxs);
 	free(env->me_path);
 	free(env->me_dirty_list);
+	free(env->me_txn0);
 	mdb_midl_free(env->me_free_pgs);
 
 	if (env->me_flags & MDB_ENV_TXKEY) {
