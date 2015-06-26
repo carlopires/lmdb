@@ -11,6 +11,7 @@
 # - MDB_USE_POSIX_SEM
 # - MDB_DSYNC
 # - MDB_FDATASYNC
+# - MDB_FDATASYNC_WORKS
 # - MDB_USE_PWRITEV
 #
 # There may be other macros in mdb.c of interest. You should
@@ -31,7 +32,7 @@ IHDRS	= lmdb.h
 ILIBS	= liblmdb.a liblmdb.so
 IPROGS	= mdb_stat mdb_copy mdb_dump mdb_load
 IDOCS	= mdb_stat.1 mdb_copy.1 mdb_dump.1 mdb_load.1
-PROGS	= $(IPROGS) mtest mtest2 mtest3 mtest4 mtest5 mtest7
+PROGS	= $(IPROGS) mtest mtest2 mtest3 mtest4 mtest5
 all:	$(ILIBS) $(PROGS)
 
 install: $(ILIBS) $(IPROGS) $(IHDRS)
@@ -41,18 +42,18 @@ install: $(ILIBS) $(IPROGS) $(IHDRS)
 	for f in $(IDOCS); do cp $$f $(DESTDIR)$(prefix)/man/man1; done
 
 clean:
-	rm -rf $(PROGS) *.[ao] *.so *~ testdb
+	rm -rf $(PROGS) *.[ao] *.[ls]o *~ testdb
 
 test:	all
-	mkdir testdb
+	rm -rf testdb && mkdir testdb
 	./mtest && ./mdb_stat testdb
 
 liblmdb.a:	mdb.o midl.o
 	ar rs $@ mdb.o midl.o
 
-liblmdb.so:	mdb.o midl.o
+liblmdb.so:	mdb.lo midl.lo
 #	$(CC) $(LDFLAGS) -pthread -shared -Wl,-Bsymbolic -o $@ mdb.o midl.o $(SOLIBS)
-	$(CC) $(LDFLAGS) -pthread -shared -o $@ mdb.o midl.o $(SOLIBS)
+	$(CC) $(LDFLAGS) -pthread -shared -o $@ mdb.lo midl.lo $(SOLIBS)
 
 mdb_stat: mdb_stat.o liblmdb.a
 mdb_copy: mdb_copy.o liblmdb.a
@@ -67,10 +68,16 @@ mtest6:	mtest6.o liblmdb.a
 mtest7:	mtest7.o liblmdb.a
 
 mdb.o: mdb.c lmdb.h midl.h
-	$(CC) $(CFLAGS) -fPIC $(CPPFLAGS) -c mdb.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c mdb.c
 
 midl.o: midl.c midl.h
-	$(CC) $(CFLAGS) -fPIC $(CPPFLAGS) -c midl.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c midl.c
+
+mdb.lo: mdb.c lmdb.h midl.h
+	$(CC) $(CFLAGS) -fPIC $(CPPFLAGS) -c mdb.c -o $@
+
+midl.lo: midl.c midl.h
+	$(CC) $(CFLAGS) -fPIC $(CPPFLAGS) -c midl.c -o $@
 
 %:	%.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
